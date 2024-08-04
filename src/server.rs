@@ -695,22 +695,25 @@ impl<T: AsyncRead + AsyncWrite + Unpin, A: Authentication> Socks5Socket<T, A> {
         // IPv4 or IPv6.
         let peer_sock = UdpSocket::bind("[::]:0").await?;
 
-        // Respect the pre-populated reply IP address.
-        self.inner
-            .write(&new_reply(
-                &ReplyError::Succeeded,
-                SocketAddr::new(
-                    // self.reply_ip.context("invalid reply ip")?,
-                    peer_sock.local_addr()?.ip(),
-                    peer_sock.local_addr()?.port(),
-                ),
-            ))
-            .await
-            .context("Can't write successful reply")?;
 
         debug!("Wrote success");
 
+        let reply = new_reply(
+            &ReplyError::Succeeded,
+            SocketAddr::new(
+                // self.reply_ip.context("invalid reply ip")?,
+                peer_sock.local_addr()?.ip(),
+                peer_sock.local_addr()?.port(),
+            ),
+        );
+
         transfer_udp(peer_sock).await?;
+
+        // Respect the pre-populated reply IP address.
+        self.inner
+            .write(&reply)
+            .await
+            .context("Can't write successful reply")?;
 
         Ok(())
     }
@@ -785,7 +788,6 @@ async fn handle_udp_request(inbound: &UdpSocket, outbound: &UdpSocket, socket_se
     });
     outbound.send_to(data, target_addr).await?;
     
-
     loop {
         let (size, client_addr) = inbound.recv_from(&mut buf).await?;
         
@@ -813,7 +815,8 @@ async fn handle_udp_request(inbound: &UdpSocket, outbound: &UdpSocket, socket_se
     }
 }
 
-async fn handle_udp_response(inbound: &UdpSocket, outbound: &UdpSocket, res_addr: SocketAddr) -> Result<()> {
+async fn handle_udp_response(inbound: &UdpSocket, outbound: &UdpSocket, socket_addr_rec: tokio::sync::oneshot::Receiver<SocketAddr>) -> Result<()> {
+    let res_addr = socket_addr_rec.await.unwrap();
     let mut buf = vec![0u8; 0x10000];
     loop {
         let (size, remote_addr) = outbound.recv_from(&mut buf).await?;
@@ -830,11 +833,8 @@ async fn transfer_udp(inbound: UdpSocket) -> Result<()> {
 
     let (socket_addr_send, socket_addr_rec) = tokio::sync::oneshot::channel::<SocketAddr>();
 
-    debug!("start udp listener");
     let req_fut = handle_udp_request(&inbound, &outbound, socket_addr_send);
-    let res_socket_addr = socket_addr_rec.await.unwrap();
-    debug!("start udp responder");
-    let res_fut = handle_udp_response(&inbound, &outbound, res_socket_addr);
+    let res_fut = handle_udp_response(&inbound, &outbound, socket_addr_rec);
     match try_join!(req_fut, res_fut) {
         Ok(_) => {}
         Err(error) => return Err(error),
