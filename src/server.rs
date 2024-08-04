@@ -794,10 +794,10 @@ async fn handle_udp_request(inbound: &UdpSocket, outbound: &UdpSocket, socket_se
         .next()
         .context("unreachable")?;
 
-    target_addr.set_ip(match target_addr.ip() {
-        std::net::IpAddr::V4(v4) => std::net::IpAddr::V6(v4.to_ipv6_mapped()),
-        v6 @ std::net::IpAddr::V6(_) => v6,
-    });
+    // target_addr.set_ip(match target_addr.ip() {
+    //     std::net::IpAddr::V4(v4) => std::net::IpAddr::V6(v4.to_ipv6_mapped()),
+    //     v6 @ std::net::IpAddr::V6(_) => v6,
+    // });
     outbound.send_to(data, target_addr).await?;
     
     loop {
@@ -819,10 +819,10 @@ async fn handle_udp_request(inbound: &UdpSocket, outbound: &UdpSocket, socket_se
             .next()
             .context("unreachable")?;
 
-        target_addr.set_ip(match target_addr.ip() {
-            std::net::IpAddr::V4(v4) => std::net::IpAddr::V6(v4.to_ipv6_mapped()),
-            v6 @ std::net::IpAddr::V6(_) => v6,
-        });
+        // target_addr.set_ip(match target_addr.ip() {
+        //     std::net::IpAddr::V4(v4) => std::net::IpAddr::V6(v4.to_ipv6_mapped()),
+        //     v6 @ std::net::IpAddr::V6(_) => v6,
+        // });
         outbound.send_to(data, target_addr).await?;
     }
 }
