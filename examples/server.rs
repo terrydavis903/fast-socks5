@@ -105,6 +105,7 @@ async fn spawn_socks_server() -> Result<()> {
     while let Some(socket_res) = incoming.next().await {
         match socket_res {
             Ok(socket) => {
+                
                 spawn_and_log_error(socket.upgrade_to_socks5());
             }
             Err(err) => {

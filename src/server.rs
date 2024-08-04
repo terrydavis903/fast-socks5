@@ -246,7 +246,8 @@ impl<'a, A: Authentication> Stream for Incoming<'a, A> {
                 );
 
                 // Wrap the TcpStream into Socks5Socket
-                let socket = Socks5Socket::new(socket, self.0.config.clone());
+                let mut socket = Socks5Socket::new(socket, self.0.config.clone());
+                socket.set_reply_ip(peer_addr.ip());
 
                 return Poll::Ready(Some(Ok(socket)));
             }
@@ -755,10 +756,39 @@ where
     Ok(())
 }
 
-async fn handle_udp_request(inbound: &UdpSocket, outbound: &UdpSocket) -> Result<()> {
+async fn handle_udp_request(inbound: &UdpSocket, outbound: &UdpSocket, socket_sender: tokio::sync::oneshot::Sender<SocketAddr>) -> Result<()> {
     let mut buf = vec![0u8; 0x10000];
+
+
+    let (size, client_addr) = inbound.recv_from(&mut buf).await?;
+        
+    debug!("Server recieve udp from {}", client_addr);
+    inbound.connect(client_addr).await?;
+    socket_sender.send(client_addr);
+
+    let (frag, target_addr, data) = parse_udp_request(&buf[..size]).await?;
+
+    if frag != 0 {
+        debug!("Discard UDP frag packets sliently.");
+        return Ok(());
+    }
+
+    debug!("Server forward to packet to {}", target_addr);
+    let mut target_addr = target_addr
+        .to_socket_addrs()?
+        .next()
+        .context("unreachable")?;
+
+    target_addr.set_ip(match target_addr.ip() {
+        std::net::IpAddr::V4(v4) => std::net::IpAddr::V6(v4.to_ipv6_mapped()),
+        v6 @ std::net::IpAddr::V6(_) => v6,
+    });
+    outbound.send_to(data, target_addr).await?;
+    
+
     loop {
         let (size, client_addr) = inbound.recv_from(&mut buf).await?;
+        
         debug!("Server recieve udp from {}", client_addr);
         inbound.connect(client_addr).await?;
 
@@ -783,13 +813,13 @@ async fn handle_udp_request(inbound: &UdpSocket, outbound: &UdpSocket) -> Result
     }
 }
 
-async fn handle_udp_response(inbound: &UdpSocket, outbound: &UdpSocket) -> Result<()> {
+async fn handle_udp_response(inbound: &UdpSocket, outbound: &UdpSocket, res_addr: SocketAddr) -> Result<()> {
     let mut buf = vec![0u8; 0x10000];
     loop {
         let (size, remote_addr) = outbound.recv_from(&mut buf).await?;
         debug!("Recieve packet from {}", remote_addr);
 
-        let mut data = new_udp_header(remote_addr)?;
+        let mut data = new_udp_header(res_addr)?;
         data.extend_from_slice(&buf[..size]);
         inbound.send(&data).await?;
     }
@@ -798,8 +828,11 @@ async fn handle_udp_response(inbound: &UdpSocket, outbound: &UdpSocket) -> Resul
 async fn transfer_udp(inbound: UdpSocket) -> Result<()> {
     let outbound = UdpSocket::bind("[::]:0").await?;
 
-    let req_fut = handle_udp_request(&inbound, &outbound);
-    let res_fut = handle_udp_response(&inbound, &outbound);
+    let (socket_addr_send, socket_addr_rec) = tokio::sync::oneshot::channel::<SocketAddr>();
+
+    let req_fut = handle_udp_request(&inbound, &outbound, socket_addr_send);
+    let res_socket_addr = socket_addr_rec.await.unwrap();
+    let res_fut = handle_udp_response(&inbound, &outbound, res_socket_addr);
     match try_join!(req_fut, res_fut) {
         Ok(_) => {}
         Err(error) => return Err(error),
