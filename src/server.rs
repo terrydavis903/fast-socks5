@@ -639,6 +639,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin, A: Authentication> Socks5Socket<T, A> {
                 Socks5Command::TCPConnect => return self.execute_command_connect().await,
                 Socks5Command::UDPAssociate => {
                     if self.config.allow_udp {
+                        debug!("associating udp");
                         return self.execute_command_udp_assoc().await;
                     } else {
                         Err(ReplyError::CommandNotSupported.into())
@@ -782,7 +783,9 @@ async fn handle_udp_request(inbound: &UdpSocket, outbound: &UdpSocket, socket_se
     let client_addr = SocketAddr::new(client_addr.ip().to_canonical(), client_addr.port());
     debug!("parsed client addr {}", client_addr);
     inbound.connect(client_addr).await?;
+    debug!("connected to client addr {}", client_addr);
     socket_sender.send(client_addr).unwrap();
+    debug!("send client addr {}", client_addr);
 
     let (frag, target_addr, data) = parse_udp_request(&buf[..size]).await?;
 
