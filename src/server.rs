@@ -830,8 +830,10 @@ async fn transfer_udp(inbound: UdpSocket) -> Result<()> {
 
     let (socket_addr_send, socket_addr_rec) = tokio::sync::oneshot::channel::<SocketAddr>();
 
+    debug!("start udp listener");
     let req_fut = handle_udp_request(&inbound, &outbound, socket_addr_send);
     let res_socket_addr = socket_addr_rec.await.unwrap();
+    debug!("start udp responder");
     let res_fut = handle_udp_response(&inbound, &outbound, res_socket_addr);
     match try_join!(req_fut, res_fut) {
         Ok(_) => {}
