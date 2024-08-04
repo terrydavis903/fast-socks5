@@ -523,12 +523,14 @@ impl<T: AsyncRead + AsyncWrite + Unpin, A: Authentication> Socks5Socket<T, A> {
     async fn request(&mut self) -> Result<()> {
         self.read_command().await?;
 
+        debug!("resolving dns");
         if self.config.dns_resolve {
             self.resolve_dns().await?;
         } else {
             debug!("Domain won't be resolved because `dns_resolve`'s config has been turned off.")
         }
 
+        debug!("resolved dns");
         if self.config.execute_command {
             self.execute_command().await?;
         }
