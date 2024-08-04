@@ -776,8 +776,9 @@ async fn handle_udp_request(inbound: &UdpSocket, outbound: &UdpSocket, socket_se
 
 
     let (size, client_addr) = inbound.recv_from(&mut buf).await?;
-        
     debug!("Server recieve udp from {}", client_addr);
+    let client_addr = SocketAddr::new(client_addr.ip().to_canonical(), client_addr.port());
+    debug!("parsed client addr {}", client_addr);
     inbound.connect(client_addr).await?;
     socket_sender.send(client_addr).unwrap();
 
