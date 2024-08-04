@@ -75,6 +75,7 @@ async fn spawn_socks_server() -> Result<()> {
     let mut config = Config::default();
     config.set_request_timeout(opt.request_timeout);
     config.set_skip_auth(opt.skip_auth);
+    config.set_udp_support(true);
 
     let config = match opt.auth {
         AuthMode::NoAuth => {

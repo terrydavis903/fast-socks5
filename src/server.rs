@@ -699,7 +699,8 @@ impl<T: AsyncRead + AsyncWrite + Unpin, A: Authentication> Socks5Socket<T, A> {
             .write(&new_reply(
                 &ReplyError::Succeeded,
                 SocketAddr::new(
-                    self.reply_ip.context("invalid reply ip")?,
+                    // self.reply_ip.context("invalid reply ip")?,
+                    peer_sock.local_addr()?.ip(),
                     peer_sock.local_addr()?.port(),
                 ),
             ))
