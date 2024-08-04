@@ -247,7 +247,7 @@ impl<'a, A: Authentication> Stream for Incoming<'a, A> {
 
                 // Wrap the TcpStream into Socks5Socket
                 let mut socket = Socks5Socket::new(socket, self.0.config.clone());
-                socket.set_reply_ip(peer_addr.ip());
+                // socket.set_reply_ip(peer_addr.ip());
 
                 return Poll::Ready(Some(Ok(socket)));
             }
@@ -764,7 +764,7 @@ async fn handle_udp_request(inbound: &UdpSocket, outbound: &UdpSocket, socket_se
         
     debug!("Server recieve udp from {}", client_addr);
     inbound.connect(client_addr).await?;
-    socket_sender.send(client_addr);
+    socket_sender.send(client_addr).unwrap();
 
     let (frag, target_addr, data) = parse_udp_request(&buf[..size]).await?;
 
