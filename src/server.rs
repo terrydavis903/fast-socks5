@@ -707,13 +707,25 @@ impl<T: AsyncRead + AsyncWrite + Unpin, A: Authentication> Socks5Socket<T, A> {
             ),
         );
 
-        transfer_udp(peer_sock).await?;
+        // transfer_udp(peer_sock).await?;
+
+        let outbound = UdpSocket::bind("[::]:0").await?;
+
+        let (socket_addr_send, socket_addr_rec) = tokio::sync::oneshot::channel::<SocketAddr>();
+
+        let req_fut = handle_udp_request(&peer_sock, &outbound, socket_addr_send);
+        let res_fut = handle_udp_response(&peer_sock, &outbound, socket_addr_rec);
+        
+        match try_join!(req_fut, res_fut) {
+            Ok(_) => {}
+            Err(error) => return Err(error),
+        }
 
         // Respect the pre-populated reply IP address.
         self.inner
-            .write(&reply)
-            .await
-            .context("Can't write successful reply")?;
+        .write(&reply)
+        .await
+        .context("Can't write successful reply")?;
 
         Ok(())
     }
