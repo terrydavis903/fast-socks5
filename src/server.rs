@@ -246,7 +246,7 @@ impl<'a, A: Authentication> Stream for Incoming<'a, A> {
                 );
 
                 // Wrap the TcpStream into Socks5Socket
-                let mut socket = Socks5Socket::new(socket, self.0.config.clone());
+                let socket = Socks5Socket::new(socket, self.0.config.clone());
                 // socket.set_reply_ip(peer_addr.ip());
 
                 return Poll::Ready(Some(Ok(socket)));
