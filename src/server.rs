@@ -838,9 +838,11 @@ async fn handle_udp_response(inbound: &UdpSocket, outbound: &UdpSocket, socket_a
     let mut buf = vec![0u8; 0x10000];
     loop {
         let (size, remote_addr) = outbound.recv_from(&mut buf).await?;
-        debug!("Recieve packet from {}", remote_addr);
+        let remote_canon_addr = SocketAddr::new(remote_addr.ip().to_canonical(), remote_addr.port());
+        debug!("Recieve packet from {}", remote_canon_addr);
 
-        let mut data = new_udp_header(remote_addr)?;
+        
+        let mut data = new_udp_header(remote_canon_addr)?;
         data.extend_from_slice(&buf[..size]);
         inbound.send(&data).await?;
     }
