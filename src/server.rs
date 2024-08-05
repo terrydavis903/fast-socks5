@@ -840,7 +840,7 @@ async fn handle_udp_response(inbound: &UdpSocket, outbound: &UdpSocket, socket_a
         let (size, remote_addr) = outbound.recv_from(&mut buf).await?;
         debug!("Recieve packet from {}", remote_addr);
 
-        let mut data = new_udp_header(res_addr)?;
+        let mut data = new_udp_header(remote_addr)?;
         data.extend_from_slice(&buf[..size]);
         inbound.send(&data).await?;
     }
